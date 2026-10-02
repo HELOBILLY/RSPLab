@@ -1,0 +1,363 @@
+/* 遥感概念线上实验室 —— 核心框架：注册表、路由、大厅、演示页脚手架、控件工厂 */
+(function () {
+  const Lab = {
+    demos: [],
+    register(d) { Lab.demos.push(d); },
+    byId(id) { return Lab.demos.find(d => d.id === id); },
+    start() {
+      window.addEventListener('hashchange', render);
+      window.addEventListener('resize', debounce(() => {
+        if (currentDemo) renderDemo(currentDemo.id);
+      }, 250));
+      render();
+    }
+  };
+  window.Lab = Lab;
+
+  let currentDemo = null;
+  let rafId = 0;
+  function stopLoop() { if (rafId) { cancelAnimationFrame(rafId); rafId = 0; } }
+  const app = () => document.getElementById('app');
+
+  function debounce(fn, ms) {
+    let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); };
+  }
+
+  /* ---------------- 控件工厂（供各演示使用） ---------------- */
+  Lab.ui = {
+    canvas(stage, height) {
+      const c = document.createElement('canvas');
+      c.style.height = height + 'px';
+      stage.appendChild(c);
+      const dpr = window.devicePixelRatio || 1;
+      const w = stage.clientWidth - 24;
+      c.width = Math.max(320, w) * dpr;
+      c.height = height * dpr;
+      const ctx = c.getContext('2d');
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      return { canvas: c, ctx, W: Math.max(320, w), H: height };
+    },
+    /* 支持两种调用：
+       * slider(panel, {label, min, max, step, value, unit, fmt, oninput})
+       * slider(panel, label, min, max, value, step, oninput, unit) */
+    slider(panel, opt, ...rest) {
+      if (typeof opt === 'string') {
+        const [min, max, value, step, oninput, unit] = rest;
+        opt = { label: opt, min, max, value, step, oninput, unit };
+      }
+      const row = document.createElement('div');
+      row.className = 'ctl-row';
+      const lab = document.createElement('span');
+      lab.className = 'ctl-label'; lab.textContent = opt.label;
+      const input = document.createElement('input');
+      input.type = 'range';
+      input.min = opt.min; input.max = opt.max;
+      input.step = opt.step || 1; input.value = opt.value;
+      const val = document.createElement('span');
+      val.className = 'ctl-val';
+      const fmt = opt.fmt || (v => v + (opt.unit || ''));
+      val.textContent = fmt(parseFloat(input.value));
+      input.addEventListener('input', () => {
+        val.textContent = fmt(parseFloat(input.value));
+        opt.oninput(parseFloat(input.value));
+      });
+      row.append(lab, input, val);
+      panel.appendChild(row);
+      return input;
+    },
+    /* cls 可为字符串类名，或 {active, group}：同组按钮互斥高亮 */
+    button(panel, label, onclick, cls) {
+      let row = panel.querySelector('.btn-row');
+      if (!row) { row = document.createElement('div'); row.className = 'btn-row'; panel.appendChild(row); }
+      const b = document.createElement('button');
+      b.textContent = label;
+      const opts = (cls && typeof cls === 'object') ? cls : null;
+      if (typeof cls === 'string') b.className = cls;
+      if (opts) {
+        if (opts.group) b.dataset.group = opts.group;
+        if (opts.active) b.classList.add('on');
+      }
+      b.addEventListener('click', () => {
+        if (opts && opts.group) {
+          panel.querySelectorAll(`button[data-group="${opts.group}"]`)
+            .forEach(x => x.classList.remove('on'));
+          b.classList.add('on');
+        }
+        if (onclick) onclick.call(b, b);
+      });
+      row.appendChild(b);
+      return b;
+    },
+    checkbox(panel, label, checked, onchange) {
+      const row = document.createElement('label');
+      row.className = 'check-row';
+      const input = document.createElement('input');
+      input.type = 'checkbox'; input.checked = checked;
+      input.addEventListener('change', () => onchange(input.checked));
+      row.append(input, document.createTextNode(label));
+      panel.appendChild(row);
+      return input;
+    },
+    readout(panel, html) {
+      const d = document.createElement('div');
+      d.className = 'readout';
+      d.innerHTML = html || '';
+      panel.appendChild(d);
+      return d;
+    },
+    title(panel, text) {
+      const h = document.createElement('h4');
+      h.textContent = text;
+      panel.appendChild(h);
+      return h;
+    }
+  };
+
+  /* ---------------- 页面渲染 ---------------- */
+  function render() {
+    stopLoop();
+    const hash = location.hash || '#/';
+    const m = hash.match(/^#\/demo\/([\w-]+)/);
+    const c = hash.match(/^#\/coding\/([\w-]+)/);
+    document.querySelectorAll('[data-nav]').forEach(a => a.classList.remove('active'));
+    if (hash.startsWith('#/forum')) {
+      location.hash = '#/';
+      return;
+    } else if (m && Lab.byId(m[1])) {
+      renderDemo(m[1]);
+    } else if (c && window.CODING && CODING.find(t => t.id === c[1])) {
+      document.querySelector('[data-nav="coding"]').classList.add('active');
+      renderCodingTutorial(c[1]);
+    } else if (hash.startsWith('#/coding')) {
+      document.querySelector('[data-nav="coding"]').classList.add('active');
+      renderCodingLobby();
+    } else if (hash.startsWith('#/graph')) {
+      document.querySelector('[data-nav="graph"]').classList.add('active');
+      currentDemo = null;
+      GraphPage.render();
+    } else if (hash.startsWith('#/about')) {
+      document.querySelector('[data-nav="about"]').classList.add('active');
+      renderAbout();
+    } else {
+      document.querySelector('[data-nav="home"]').classList.add('active');
+      renderLobby();
+    }
+    window.scrollTo(0, 0);
+  }
+
+  const GROUPS = [
+    { key: 'intro', name: '模块1 绪论', sub: '1次课 · 遥感过程全貌' },
+    { key: 'phys', name: '模块2 电磁波辐射特性及传输', sub: '3次课 · 传输特性 / 发射特性 / 反射特性' },
+    { key: 'platform', name: '模块3 遥感平台', sub: '2次课 · 遥感平台 / 遥感卫星轨道' },
+    { key: 'sensor', name: '模块4 成像传感器及图像特性', sub: '4次课 · 光学基础 / 摄影型 / 扫描型 / 雷达' },
+    { key: 'proc', name: '模块5 遥感图像处理与分析', sub: '4次课 · 校正 / 判读 / 融合 / 分类' },
+    { key: 'app', name: '模块6 遥感应用', sub: '变化检测与行业应用' },
+  ];
+
+  function renderLobby() {
+    currentDemo = null;
+    const el = app();
+    const total = Lab.demos.length;
+    el.innerHTML = `
+      <section class="hero">
+        <h1>概念口袋实验室 · 让每一个抽象概念都可演示</h1>
+        <p>这里是《遥感技术基础》课程的"概念口袋实验室"：覆盖全课程 6 个模块 15 次理论课，把电磁波、辐射传输、
+        卫星轨道、SAR 成像、计算机分类等"看不见、摸不着"的概念，变成可拖动、可测量、可探究的交互实验。
+        先看清知识全貌请进 <a href="#/graph">课程知识图谱</a>，动手写代码请进 <a href="#/coding">编程口袋实验室</a>。</p>
+        <div class="stat-row">
+          <div class="stat"><b>${total}</b><span>个交互演示</span></div>
+          <div class="stat"><b>6</b><span>模块全覆盖</span></div>
+          <div class="stat"><b>15</b><span>次理论课</span></div>
+          <div class="stat"><b>0</b><span>编程基础即可使用</span></div>
+        </div>
+      </section>`;
+    for (const g of GROUPS) {
+      const list = Lab.demos.filter(d => d.group === g.key);
+      if (!list.length) continue;
+      const h = document.createElement('h2');
+      h.className = 'group-title';
+      h.innerHTML = `${g.name} <small>${g.sub}</small>`;
+      el.appendChild(h);
+      const grid = document.createElement('div');
+      grid.className = 'cards';
+      for (const d of list) {
+        const a = document.createElement('a');
+        a.className = 'card';
+        a.href = '#/demo/' + d.id;
+        a.innerHTML = `
+          <span class="icon">${d.icon || '演'}</span>
+          <h3>${d.title}</h3>
+          <p>${d.brief}</p>
+          <span class="tags">
+            ${d.session ? `<span class="tag ses">${d.session}</span>` : ''}
+            <span class="tag">${d.concept}</span>
+            ${d.military ? `<span class="tag mil">场景应用：${d.military}</span>` : ''}
+          </span>`;
+        grid.appendChild(a);
+      }
+      el.appendChild(grid);
+    }
+  }
+
+  function renderDemo(id) {
+    const d = Lab.byId(id);
+    if (!d) { location.hash = '#/'; return; }
+    currentDemo = d;
+    const el = app();
+    el.innerHTML = `
+      <div class="demo-head">
+        <a class="back" href="#/">← 返回演示大厅</a>
+        <h1>${d.title}</h1>
+        <div class="tags">
+          ${d.session ? `<span class="tag ses">${d.session}</span>` : ''}
+          <span class="tag">${d.concept}</span>
+          ${d.military ? `<span class="tag mil">场景应用：${d.military}</span>` : ''}
+        </div>
+      </div>
+      <div class="concept-box"><b>概念卡片｜</b>${d.summary}</div>
+      <div class="lab-grid">
+        <div class="stage" id="stage"></div>
+        <div class="panel" id="panel"><h4>控制面板</h4></div>
+      </div>
+      <div class="teach-box">
+        <div class="col old"><h4>传统课堂怎么讲</h4><p>${d.teach.old}</p></div>
+        <div class="col now"><h4>线上实验室怎么学</h4><p>${d.teach.now}</p></div>
+      </div>`;
+    const stage = el.querySelector('#stage');
+    const panel = el.querySelector('#panel');
+    stopLoop();
+    const tick = d.render(stage, panel);
+    if (typeof tick === 'function') {
+      const loop = () => { tick(); rafId = requestAnimationFrame(loop); };
+      loop();
+    }
+  }
+
+  /* ---------------- 编程口袋实验室 ---------------- */
+  const CGROUPS = [
+    { key: 'base', name: '遥感图像处理基础实验', sub: '灰度值处理 / NDVI / 融合 / 平滑 / 锐化 / K-means聚类 · 完整可运行代码' },
+    { key: 'dl', name: '深度学习实验', sub: '场景分类 / 语义分割 / 目标检测 / 变化检测 / 跟踪 / 规划 / 跨视角匹配' },
+    { key: 'llm', name: '大模型相关任务', sub: '多模态大模型 / 自然语言生成代码 / 辅助判读报告' },
+  ];
+
+  /* 课内8学时实战任务链 → 本实验室对应教程（三级实践体系的课外深化环节） */
+  const TASK_CHAIN = [
+    { n: '任务一', title: '侦察影像认识与波段运算', scene: '上级通报：某地域疑似出现新的阵地设施，先读懂手头的侦察影像', ids: [['gray', '灰度值处理'], ['ndvi-calc', 'NDVI计算']] },
+    { n: '任务二', title: '侦察影像增强', scene: '影像受光照与云雾影响，把目标细节凸显出来', ids: [['smooth', '平滑滤波'], ['sharpen', '锐化']] },
+    { n: '任务三', title: '阵地目标分类', scene: '在整幅影像中区分阵地设施、道路、植被与背景', ids: [['scene-cls', '场景分类'], ['seg', '语义分割']] },
+    { n: '任务四', title: '战场变化检测', scene: '对比前后两时相影像，锁定新增设施与态势变化', ids: [['cd', '变化检测']] },
+  ];
+
+  function escapeHtml(s) {
+    return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function renderCodingLobby() {
+    currentDemo = null;
+    const el = app();
+    const total = (window.CODING || []).length;
+    el.innerHTML = `
+      <section class="hero">
+        <h1>编程口袋实验室 · 把概念变成代码</h1>
+        <p>这里把概念实验室里的原理变成可上机的实验：每个实验标明所需输入数据、处理步骤，
+        基础实验附完整可运行代码（复制即可跑），深度学习与大模型实验给出关键代码骨架与精选 GitHub 参考仓库。
+        回到 <a href="#/">概念口袋实验室</a> 继续玩交互演示。</p>
+        <div class="stat-row">
+          <div class="stat"><b>${total}</b><span>个上机实验</span></div>
+          <div class="stat"><b>6</b><span>个基础实验含完整代码</span></div>
+          <div class="stat"><b>7</b><span>个深度学习任务</span></div>
+          <div class="stat"><b>3</b><span>个大模型任务</span></div>
+        </div>
+      </section>`;
+    const chain = TASK_CHAIN.map((s, i) => {
+      const links = s.ids.map(([id, label]) =>
+        `<a class="tc-link" href="#/coding/${id}">${label}</a>`).join('');
+      return `${i ? '<span class="tc-arrow">→</span>' : ''}
+        <div class="tc-step">
+          <div class="tc-head"><b>${s.n}</b>${s.title}</div>
+          <p>${s.scene}</p>
+          <div class="tc-links">${links}</div>
+        </div>`;
+    }).join('');
+    el.insertAdjacentHTML('beforeend', `
+      <section class="taskchain">
+        <h2>实战任务链 · 带着任务用技能</h2>
+        <p class="tc-sub">课内 8 学时实践按"场景导入—技能训练—场景回扣"组织为四个递进任务；课外在本实验室对应教程中深化，
+        综合演练课上集成运用——三级实践，阶梯生成。</p>
+        <div class="tc-steps">${chain}</div>
+      </section>`);
+    for (const g of CGROUPS) {
+      const list = (window.CODING || []).filter(t => t.group === g.key);
+      if (!list.length) continue;
+      const h = document.createElement('h2');
+      h.className = 'group-title';
+      h.innerHTML = `${g.name} <small>${g.sub}</small>`;
+      el.appendChild(h);
+      const grid = document.createElement('div');
+      grid.className = 'cards';
+      for (const t of list) {
+        const a = document.createElement('a');
+        a.className = 'card';
+        a.href = '#/coding/' + t.id;
+        a.innerHTML = `
+          <span class="icon">${t.icon}</span>
+          <h3>${t.title}</h3>
+          <p>${t.goal}</p>
+          <span class="tags">
+            <span class="tag lv">${t.level}</span>
+            <span class="tag">${t.time}</span>
+          </span>`;
+        grid.appendChild(a);
+      }
+      el.appendChild(grid);
+    }
+  }
+
+  function renderCodingTutorial(id) {
+    const t = CODING.find(t => t.id === id);
+    const el = app();
+    el.innerHTML = `
+      <div class="demo-head">
+        <a class="back" href="#/coding">← 返回编程实验室</a>
+        <h1>${t.title}</h1>
+        <div class="tags">
+          <span class="tag lv">${t.level}</span>
+          <span class="tag">${t.time}</span>
+        </div>
+      </div>
+      <div class="tut">
+        <div class="tut-sec"><h3>实验目标</h3><p>${t.goal}</p></div>
+        <div class="tut-sec"><h3>所需输入数据</h3><p>${t.data}</p></div>
+        <div class="tut-sec"><h3>环境依赖</h3><pre><code>${escapeHtml(t.env)}</code></pre></div>
+        <div class="tut-sec"><h3>处理步骤</h3><ol class="steps">${t.steps.map(s => `<li>${s}</li>`).join('')}</ol></div>
+        ${t.code ? `<div class="tut-sec"><h3>参考代码</h3><pre class="code"><code>${escapeHtml(t.code)}</code></pre></div>` : ''}
+        <div class="tut-sec"><h3>参考资源</h3>
+          <div class="refs">${t.refs.map(([n, u, d]) =>
+            `<a class="ref" href="${u}" target="_blank" rel="noopener"><b>${n}</b><span>${d}</span></a>`).join('')}
+          </div>
+        </div>
+        <div class="tut-sec think"><h3>实验思考</h3><p>${t.think}</p></div>
+      </div>`;
+  }
+
+  function renderAbout() {
+    currentDemo = null;
+    app().innerHTML = `
+      <div class="about">
+        <h1>关于本实验室</h1>
+        <p>本站点是《遥感技术基础》课程"AI线上实验室"的配套资源，分三个部分：<b>课程知识图谱</b>按"信号—数据—信息—决策"
+        知识链组织6个模块15次理论课，上层课次图谱标明概念间的逻辑关系与因果链条，支持按专业学习路径
+        分强相关、中相关、弱相关三级高亮显示（覆盖测绘工程、遥感科学与技术、导航工程、地理空间信息工程、XX环境工程、
+        地理科学6个专业）；下层知识点串联图谱把蕴藏在课次内的45个知识点以圆形节点相连成链，点击任一知识点
+        即可查看释义、所属课次与配套资源；<b>概念口袋实验室</b>覆盖全课程6个模块15次理论课，每次课至少配套一个可交互演示；
+        <b>编程口袋实验室</b>把概念变成上机实验，覆盖遥感图像处理基础、深度学习七大任务与大模型应用，
+        每个实验标明输入数据与处理步骤，基础实验附完整可运行代码，首页实战任务链把四个递进任务与对应教程串成一线。</p>
+        <h2>使用建议</h2>
+        <p>课前：浏览对应演示，建立直观印象；课中：配合教师演示，预测参数变化的结果；课后：用"考一考"
+        等功能自我检验。所有计算均在浏览器本地完成，无需安装任何软件。</p>
+        <h2>技术说明</h2>
+        <p>纯静态站点（HTML + CSS + 原生 JavaScript + Canvas 2D），无第三方依赖，可直接部署到
+        GitHub Pages 或任意静态托管；也可用 <code>python3 -m http.server</code> 在本地打开。</p>
+      </div>`;
+  }
+})();
