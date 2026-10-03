@@ -160,7 +160,7 @@
     const total = Lab.demos.length;
     el.innerHTML = `
       <section class="hero">
-        <h1>概念口袋实验室 · 让每一个抽象概念都可演示</h1>
+        <h1>概念口袋实验室 · 让每一个抽象概念都可交互</h1>
         <p>这里是《遥感技术基础》课程的"概念口袋实验室"：覆盖全课程 6 个模块 15 次理论课，把电磁波、辐射传输、
         卫星轨道、SAR 成像、计算机分类等"看不见、摸不着"的概念，变成可拖动、可测量、可探究的交互实验。
         先看清知识全貌请进 <a href="#/graph">课程知识图谱</a>，动手写代码请进 <a href="#/coding">编程口袋实验室</a>。</p>
@@ -352,6 +352,49 @@
         即可查看释义、所属课次与配套资源；<b>概念口袋实验室</b>覆盖全课程6个模块15次理论课，每次课至少配套一个可交互演示；
         <b>编程口袋实验室</b>把概念变成上机实验，覆盖遥感图像处理基础、深度学习七大任务与大模型应用，
         每个实验标明输入数据与处理步骤，基础实验附完整可运行代码，首页实战任务链把四个递进任务与对应教程串成一线。</p>
+        <section class="impact-evidence" aria-labelledby="impact-title">
+          <div class="impact-heading">
+            <div>
+              <span class="impact-eyebrow">教学成效证据</span>
+              <h2 id="impact-title">从交互次数到多维验证</h2>
+              <p>课程组面向四届授课学员与课程主讲教师开展调研，结合课堂观察和作业成果分析，形成可追踪、可复核的教学成效证据链。</p>
+            </div>
+            <div class="impact-lead"><strong>23.6</strong><span>人均完成交互实验</span><small>四届课程调研数据</small></div>
+          </div>
+          <div class="impact-kpis">
+            <div class="impact-kpi accent"><strong>23.6</strong><span>人均完成交互实验</span><small>核心成效指标</small></div>
+            <div class="impact-kpi"><strong>286</strong><span>授课学员</span><small>四届覆盖样本</small></div>
+            <div class="impact-kpi"><strong>4</strong><span>覆盖届次</span><small>连续跟踪</small></div>
+            <div class="impact-kpi"><strong>3</strong><span>课程主讲教师</span><small>教师视角交叉验证</small></div>
+          </div>
+          <div class="impact-grid">
+            <section class="impact-panel">
+              <div class="impact-panel-head"><h3>典型交互行为链</h3><span>点击查看</span></div>
+              <p class="impact-panel-intro">交互实验把抽象概念拆成连续动作：定位知识、改变参数、观察结果，再回到资源与任务。</p>
+              <div class="interaction-steps" id="interaction-steps">
+                <button type="button" class="interaction-step" data-step="0"><b>01</b><span>点击知识节点</span></button>
+                <button type="button" class="interaction-step" data-step="1"><b>02</b><span>拖动参数</span></button>
+                <button type="button" class="interaction-step" data-step="2"><b>03</b><span>观察即时变化</span></button>
+                <button type="button" class="interaction-step" data-step="3"><b>04</b><span>关联实验资源</span></button>
+              </div>
+              <div class="interaction-readout" id="interaction-readout" aria-live="polite"><b>等待操作</b><span>点击上方任一环节，查看它如何把概念变成可观察证据。</span></div>
+              <div class="interaction-progress"><div><i id="interaction-progress-bar"></i></div><span id="interaction-progress-text">已查看 0 / 4 个环节</span></div>
+              <small class="impact-method-note">交互行为链是平台操作机制示意，不等同于 23.6 次的统计口径。</small>
+            </section>
+            <section class="impact-panel">
+              <div class="impact-panel-head"><h3>多维度交叉验证</h3><span>3 类证据来源</span></div>
+              <p class="impact-panel-intro">同一教学成效由不同材料相互印证，点击证据来源查看对应观察对象与分析材料。</p>
+              <div class="validation-tabs" id="validation-tabs">
+                <button type="button" class="validation-tab on" data-evidence="survey">学员调研</button>
+                <button type="button" class="validation-tab" data-evidence="observe">课堂观察</button>
+                <button type="button" class="validation-tab" data-evidence="work">作业成果</button>
+              </div>
+              <div class="validation-detail" id="validation-detail" aria-live="polite"></div>
+              <div class="validation-flow"><span>对象</span><b>→</b><span>证据</span><b>→</b><span>交叉验证</span></div>
+            </section>
+          </div>
+          <p class="impact-footnote"><b>调研范围：</b>四届 286 名授课学员、3 名课程主讲教师；围绕专业、课程与学情等要素，辅以课堂观察、作业成果分析开展多维度交叉验证。</p>
+        </section>
         <h2>使用建议</h2>
         <p>课前：浏览对应演示，建立直观印象；课中：配合教师演示，预测参数变化的结果；课后：用"考一考"
         等功能自我检验。所有计算均在浏览器本地完成，无需安装任何软件。</p>
@@ -359,5 +402,40 @@
         <p>纯静态站点（HTML + CSS + 原生 JavaScript + Canvas 2D），无第三方依赖，可直接部署到
         GitHub Pages 或任意静态托管；也可用 <code>python3 -m http.server</code> 在本地打开。</p>
       </div>`;
+    const interactionCopy = [
+      ['点击知识节点', '从知识图谱中定位概念，先建立“它处在课程哪里”的整体认识。'],
+      ['拖动参数', '改变温度、波段、角度或权重等参数，让抽象机理进入可操作状态。'],
+      ['观察即时变化', '通过曲线、影像、读数或动画反馈，形成对因果关系的直观判断。'],
+      ['关联实验资源', '沿当前知识点跳转概念演示、编程教程或实战任务，完成迁移应用。']
+    ];
+    const evidenceCopy = {
+      survey: ['学员调研', '对象：四届 286 名授课学员。', '材料：围绕专业、课程与学情等要素采集使用反馈与学习体验。'],
+      observe: ['课堂观察', '对象：课程实施过程。', '材料：记录知识图谱定位、参数操作、课堂讨论和演示反馈等现场行为。'],
+      work: ['作业成果', '对象：课程作业与实践产出。', '材料：分析概念是否转化为波段运算、图像处理、分类和变化检测等步骤。']
+    };
+    const interactionButtons = document.querySelectorAll('#interaction-steps [data-step]');
+    const interactionReadout = document.getElementById('interaction-readout');
+    const interactionBar = document.getElementById('interaction-progress-bar');
+    const interactionText = document.getElementById('interaction-progress-text');
+    const visitedSteps = new Set();
+    interactionButtons.forEach(button => {
+      button.addEventListener('click', () => {
+        const index = Number(button.dataset.step);
+        visitedSteps.add(index);
+        interactionButtons.forEach(item => item.classList.toggle('on', item === button));
+        interactionReadout.innerHTML = '<b>' + interactionCopy[index][0] + '</b><span>' + interactionCopy[index][1] + '</span>';
+        interactionBar.style.width = (visitedSteps.size / interactionCopy.length * 100) + '%';
+        interactionText.textContent = '已查看 ' + visitedSteps.size + ' / ' + interactionCopy.length + ' 个环节';
+      });
+    });
+    const validationTabs = document.querySelectorAll('#validation-tabs [data-evidence]');
+    const validationDetail = document.getElementById('validation-detail');
+    function renderEvidence(key) {
+      const item = evidenceCopy[key];
+      validationDetail.innerHTML = '<strong>' + item[0] + '</strong><span>' + item[1] + '</span><span>' + item[2] + '</span>';
+      validationTabs.forEach(tab => tab.classList.toggle('on', tab.dataset.evidence === key));
+    }
+    validationTabs.forEach(tab => tab.addEventListener('click', () => renderEvidence(tab.dataset.evidence)));
+    renderEvidence('survey');
   }
 })();
