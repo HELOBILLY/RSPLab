@@ -119,6 +119,7 @@
     const hash = location.hash || '#/';
     const m = hash.match(/^#\/demo\/([\w-]+)/);
     const c = hash.match(/^#\/coding\/([\w-]+)/);
+    const s = hash.match(/^#\/scenario\/([\w-]+)/);
     document.querySelectorAll('[data-nav]').forEach(a => a.classList.remove('active'));
     if (hash.startsWith('#/forum')) {
       location.hash = '#/';
@@ -131,6 +132,14 @@
     } else if (hash.startsWith('#/coding')) {
       document.querySelector('[data-nav="coding"]').classList.add('active');
       renderCodingLobby();
+    } else if (s && window.SCENARIOS && SCENARIOS.find(item => item.id === s[1])) {
+      document.querySelector('[data-nav="scenario"]').classList.add('active');
+      currentDemo = null;
+      ScenarioPage.render(s[1]);
+    } else if (hash.startsWith('#/scenario')) {
+      document.querySelector('[data-nav="scenario"]').classList.add('active');
+      currentDemo = null;
+      ScenarioPage.render();
     } else if (hash.startsWith('#/graph')) {
       document.querySelector('[data-nav="graph"]').classList.add('active');
       currentDemo = null;
