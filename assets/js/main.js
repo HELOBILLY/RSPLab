@@ -120,11 +120,15 @@
     const m = hash.match(/^#\/demo\/([\w-]+)/);
     const c = hash.match(/^#\/coding\/([\w-]+)/);
     const s = hash.match(/^#\/scenario\/([\w-]+)/);
-    document.querySelectorAll('[data-nav]').forEach(a => a.classList.remove('active'));
+    document.querySelectorAll('[data-nav]').forEach(a => {
+      a.classList.remove('active');
+      a.removeAttribute('aria-current');
+    });
     if (hash.startsWith('#/forum')) {
       location.hash = '#/';
       return;
     } else if (m && Lab.byId(m[1])) {
+      document.querySelector('[data-nav="concept"]').classList.add('active');
       renderDemo(m[1]);
     } else if (c && window.CODING && CODING.find(t => t.id === c[1])) {
       document.querySelector('[data-nav="coding"]').classList.add('active');
@@ -147,11 +151,64 @@
     } else if (hash.startsWith('#/about')) {
       document.querySelector('[data-nav="about"]').classList.add('active');
       renderAbout();
+    } else if (hash.startsWith('#/concept')) {
+      document.querySelector('[data-nav="concept"]').classList.add('active');
+      renderLobby();
     } else {
       document.querySelector('[data-nav="home"]').classList.add('active');
-      renderLobby();
+      renderCover();
     }
+    const activeNav = document.querySelector('[data-nav].active');
+    if (activeNav) activeNav.setAttribute('aria-current', 'page');
     window.scrollTo(0, 0);
+  }
+
+  function renderCover() {
+    currentDemo = null;
+    const labs = [
+      {
+        href: '#/concept', key: 'concept', number: '01',
+        name: '概念口袋实验室', english: 'Concept Pocket Lab',
+        description: '把电磁波谱、卫星轨道、成像与图像处理等抽象概念，变成可拖动、可测量、可探究的实验。',
+        action: '进入概念实验室'
+      },
+      {
+        href: '#/coding', key: 'coding', number: '02',
+        name: '编程口袋实验室', english: 'Coding Pocket Lab',
+        description: '从波段运算到图像融合与目标检测，通过处理步骤、参考代码和学习资源，练习把原理转化为算法。',
+        action: '进入编程实验室'
+      },
+      {
+        href: '#/scenario', key: 'scenario', number: '03',
+        name: '情景口袋实验室', english: 'Scenario Pocket Lab',
+        description: '从光谱对比、目标标注到洪涝变化与多源融合，使用内置教学样例调参、分析并导出成果。',
+        action: '进入情景实验室'
+      },
+      {
+        href: '#/graph', key: 'graph', number: '04',
+        name: '课程知识图谱', english: 'Course Knowledge Graph',
+        description: '沿“信号—数据—信息—决策”主线组织课程知识，并根据不同专业突出学习重点、串联课次与实验资源。',
+        action: '进入知识图谱'
+      }
+    ];
+    app().innerHTML = `
+      <div class="cover-page">
+        <section class="cover-hero" aria-labelledby="cover-title">
+          <p class="cover-kicker">《遥感技术基础》课程配套学习平台</p>
+          <h1 id="cover-title">遥感口袋实验室</h1>
+          <p class="cover-english" lang="en">Remote Sensing Pocket Lab</p>
+          <p class="cover-description">以课程知识为主线，连接概念交互、编程实践、情景任务与专业化图谱导学，让抽象的遥感原理可以观察、操作、计算和应用。</p>
+          <div class="cover-lab-grid">${labs.map(lab => `
+            <a class="cover-lab ${lab.key}" href="${lab.href}">
+              <span class="cover-lab-number" aria-hidden="true">${lab.number}</span>
+              <h3>${lab.name}</h3>
+              <p class="cover-lab-english" lang="en">${lab.english}</p>
+              <p class="cover-lab-description">${lab.description}</p>
+              <span class="cover-lab-action">${lab.action} <i aria-hidden="true">→</i></span>
+            </a>`).join('')}
+          </div>
+        </section>
+      </div>`;
   }
 
   const GROUPS = [
@@ -169,6 +226,7 @@
     const total = Lab.demos.length;
     el.innerHTML = `
       <section class="hero">
+        <p class="lab-name-en" lang="en">Concept Pocket Lab</p>
         <h1>概念口袋实验室 · 让每一个抽象概念都可交互</h1>
         <p>这里是《遥感技术基础》课程的"概念口袋实验室"：覆盖全课程 6 个模块 15 次理论课，把电磁波、辐射传输、
         卫星轨道、SAR 成像、计算机分类等"看不见、摸不着"的概念，变成可拖动、可测量、可探究的交互实验。
@@ -210,12 +268,12 @@
 
   function renderDemo(id) {
     const d = Lab.byId(id);
-    if (!d) { location.hash = '#/'; return; }
+    if (!d) { location.hash = '#/concept'; return; }
     currentDemo = d;
     const el = app();
     el.innerHTML = `
       <div class="demo-head">
-        <a class="back" href="#/">← 返回演示大厅</a>
+        <a class="back" href="#/concept">← 返回演示大厅</a>
         <h1>${d.title}</h1>
         <div class="tags">
           ${d.session ? `<span class="tag ses">${d.session}</span>` : ''}
@@ -267,10 +325,11 @@
     const total = (window.CODING || []).length;
     el.innerHTML = `
       <section class="hero">
+        <p class="lab-name-en" lang="en">Coding Pocket Lab</p>
         <h1>编程口袋实验室 · 把概念变成代码</h1>
         <p>这里把概念实验室里的原理变成可上机的实验：每个实验标明所需输入数据、处理步骤，
         基础实验附完整可运行代码（复制即可跑），深度学习与大模型实验给出关键代码骨架与精选 GitHub 参考仓库。
-        回到 <a href="#/">概念口袋实验室</a> 继续玩交互演示。</p>
+        回到 <a href="#/concept">概念口袋实验室</a> 继续玩交互演示。</p>
         <div class="stat-row">
           <div class="stat"><b>${total}</b><span>个上机实验</span></div>
           <div class="stat"><b>6</b><span>个基础实验含完整代码</span></div>
